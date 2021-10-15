@@ -112,6 +112,18 @@ cc_library {
             ],
         },
     },
+    target: {
+        android: {
+            cflags: [
+                "-g",
+                "-DUSE_LIBLOG",
+            ],
+            shared_libs: ["liblog"],
+        },
+        darwin: {
+            enabled: false,
+        },
+    },
 }
 
 cc_library_static {

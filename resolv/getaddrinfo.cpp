@@ -32,10 +32,13 @@
 
 #define LOG_TAG "getaddrinfo"
 
+#include <stdlib.h>
 #include "getaddrinfo.h"
+#include <log/log.h>
 
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
+#include <netinet/in.h>
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
@@ -275,6 +278,68 @@ int getaddrinfo_numeric(const char* hostname, const char* servname, addrinfo hin
                                             &event);
 }
 
+int shouldBlockRequest(const char* hostname, int uid){
+       int sock;
+	struct sockaddr_in server;
+	char message[1000] , server_reply[2000];
+	
+	//Create socket
+	sock = socket(AF_INET , SOCK_STREAM | SOCK_CLOEXEC, IPPROTO_TCP);
+	if (sock == -1)
+	{
+		ALOGD("Socket: Could not create socket");
+	}
+	ALOGD("Socket: created");
+	
+	server.sin_addr.s_addr = inet_addr("127.0.0.1");
+	server.sin_family = AF_INET;
+	server.sin_port = htons( 8888 );
+
+	//Connect to remote server
+	if (connect(sock , (struct sockaddr *)&server , sizeof(server)) < 0)
+	{
+		ALOGD("Socket: connect failed. Error");
+		return -1;
+	}
+	
+	ALOGD("Socket: Connected\n");
+	
+	//keep communicating with server
+
+	snprintf(message,sizeof(message), "%s,%d", hostname, uid);
+	//Send some data
+	if( send(sock , message , strlen(message) , 0) < 0)
+	{
+		ALOGD("Socket: Send failed");
+		close(sock);
+		return 0;
+	}
+	shutdown(sock, SHUT_WR);
+	//Receive a reply from the server
+	if( recv(sock , server_reply , 2000 , 0) < 0)
+	{
+		ALOGD("Socket:recv failed");
+		close(sock);
+		return 0;
+	}
+		
+	ALOGD("Socket: Server reply :");
+	ALOGD("Socket: %s",server_reply);
+	if(strncmp(server_reply, "pass", 4) == 0){
+		ALOGD("Socket: Shouldn't block %d", strcmp(server_reply, "pass"));
+		close(sock);
+		return 0;
+	}
+        else {
+		ALOGD("Socket: should block: %d", strcmp(server_reply, "pass"));
+		close(sock);
+		return 1;
+	}
+	close(sock);
+	return 0;
+
+}
+
 int android_getaddrinfofornetcontext(const char* hostname, const char* servname,
                                      const struct addrinfo* hints,
                                      const struct android_net_context* netcontext,
@@ -300,6 +365,11 @@ int android_getaddrinfofornetcontext(const char* hostname, const char* servname,
             .ai_addr = nullptr,
             .ai_next = nullptr,
     };
+    if(hostname != nullptr && shouldBlockRequest(hostname, netcontext->uid) == 1){
+	char* dest = new char[10];;
+        strcpy(dest, "localhost");
+        hostname = dest;
+    }
 
     do {
         if (hostname == NULL && servname == NULL) {
