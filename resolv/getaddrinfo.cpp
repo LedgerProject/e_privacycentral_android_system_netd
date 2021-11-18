@@ -3,6 +3,7 @@
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * Copyright (C) 2021 ECORP
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
